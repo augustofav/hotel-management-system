@@ -27,13 +27,9 @@ async function createUser(
             [parseInt(id_usuario), email, senha, nome, role]
         )
 
-        const response = await getUserById(id_usuario)
-        return {
-            id: response.id,
-            email: response.email,
-            name: response.name,    
-            role: response.role
-        }
+        const resposta = `usuario ${nome} com a permissao de  ${role} criado  .`;
+        console.log(resposta);
+        return resposta;
     } catch (error) {
         console.error(error)
         return "Ocorreu um erro ao criar o usuario"
@@ -42,20 +38,26 @@ async function createUser(
 
 async function getUserById(id: string): Promise<any> {
     try {
-       
         const [result]: any = await db.query(
-            "SELECT id, email, name, role FROM usuario WHERE id = ?",
-            [id]
+            "SELECT * FROM usuario WHERE id = ?",
+            [parseInt(id, 10)]
         )
-        if (result.length > 0) {
-            return result[0] 
+        console.log("resultado da consulta (raw)", result)
+
+        if (result.rows && result.rows.length > 0) {
+            console.log("usuario encontrado", result.rows[0])
+            return result.rows[0]
+        } else {
+            console.log("nenhum usuario encontrado para o id", id)
+            return null
         }
-        return null
     } catch (error) {
-        console.error(error)
-        throw new Error("Erro ao buscar o usuario")
+        console.error("erro ao buscar o usuario", error)
+        throw new Error("erro ao buscar o usuario")
     }
 }
+
+
 
 async function checkExistingId(id: string): Promise<boolean> {
     try {
