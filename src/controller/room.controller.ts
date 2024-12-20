@@ -23,6 +23,7 @@ const roomController = {
 
     rentRoom: async (req: Request, res: Response): Promise<void> => {
         const { roomId } = req.params
+        const { endDate, startDate } = req.body
         console.log(roomId)
 
         try {
@@ -30,7 +31,7 @@ const roomController = {
                 res.status(400).send('id e obrigatorio')
                 return
             }
-            const result = await roomService.rentRoom(roomId)
+            const result = await roomService.rentRoom(roomId, endDate, startDate)
 
             res.status(200).send(result)
             
