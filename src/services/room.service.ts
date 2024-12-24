@@ -2,6 +2,7 @@ const express = require('express')
 const app = express()
 import { response } from 'express';
 import { db } from '../config/database';
+import { format } from 'date-fns';
 const cron = require('node-cron');
 
 
@@ -15,6 +16,10 @@ async function createRoom(hotelId: number,
     try {
         if(!hotelId || !roomNumber || !type || !price){
             return 'Campos obrigatorios'
+        }
+
+        if(price < 0){
+            return 'Preço invalido'
         }
         
         await db.query(
@@ -30,20 +35,21 @@ async function createRoom(hotelId: number,
 }
 async function rentRoom(roomId: string, endDate: Date, startDate: Date): Promise<any> {
     try {
-        if (!roomId || !startDate || !endDate) {
-            return 'id do quarto, data de inicio e data de fim sao obrigatorios'
+        if (!roomId || !startDate || !endDate || new Date(startDate) > new Date(endDate) || new Date(startDate) < new Date()) {
+            return 'dados invalidos'
         }
 
+        const formattedStartDate = format(new Date(startDate), 'yyyy-MM-dd HH:mm:ss')
+        const formattedEndDate = format(new Date(endDate), 'yyyy-MM-dd HH:mm:ss')
+
         const [existingReservation]: any = await db.query(
-            "SELECT status FROM reservas WHERE room_id = ? AND status = 'booked'",
+            "SELECT status FROM rooms WHERE id = ? AND status = 'booked'",
             [roomId]
         )
 
-
-
         await db.query(
-            "UPDATE reservas SET status = 'booked', start_date = ?, end_date = ? WHERE room_id = ?",
-            [startDate, endDate, roomId]
+            "UPDATE rooms SET status = 'booked', start_date = ?, end_date = ? WHERE id = ?",
+            [formattedStartDate, formattedEndDate, roomId]
         )
 
         return 'quarto alugado com sucesso'
@@ -54,23 +60,18 @@ async function rentRoom(roomId: string, endDate: Date, startDate: Date): Promise
 }
 
 
-    cron.schedule('*/1 * * * *', async () => {
+cron.schedule('*/1 * * * *', async () => {
     try {
-        const [reservas]: any = await db.query(
-            "SELECT room_id FROM reservas WHERE status = 'booked' AND end_date <= NOW()"
-        )
-
-        for (const reserva of reservas) {
-            await db.query(
-                "UPDATE reservas SET status = 'available' WHERE room_id = ?",
-                [reserva.room_id]
-            )
-            console.log(`status do quarto ${reserva.room_id} atualizado'`)
-        }
+        await db.query(`
+            UPDATE rooms 
+            SET status = 'available', start_date = NULL, end_date = NULL
+            WHERE end_date <= NOW() AND status = 'booked'
+        `)
     } catch (error) {
-        console.error('erro ao atualizar status dos quartos', error)
+        console.error('Erro ao liberar quartos', error)
     }
 })
+
 
 async function getAllRoomsAvailable(): Promise<any[]> {
     try {
@@ -84,9 +85,48 @@ async function getAllRoomsAvailable(): Promise<any[]> {
   
     }}
 
+    async function deleteRoom(roomId: string): Promise<any> {
+        try {
+            await db.query("DELETE FROM rooms WHERE id = ?", [roomId]);
+            return 'Quarto removido com sucesso';
+        } catch (error) {
+            console.error('Erro ao remover o quarto', error);
+            return 'Erro ao remover o quarto';
+        }
+    }
+    async function updateRoom(roomId: string, hotelId: number, 
+        roomNumber: string, 
+        type: string, 
+        price: number): Promise<any> {
+        try {
+            if(!hotelId || !roomNumber || !type || !price){
+                return 'Campos obrigatorios'
+            }
+    
+            if(price < 0){
+                return 'Preço invalido'
+            }
+            
+            await db.query(
+                "UPDATE rooms SET hotel_id = ?, room_number = ?, type = ?, price = ? WHERE id = ?",
+                [hotelId, roomNumber, type, price, roomId]
+            )
+    
+            return 'Quarto atualizado com sucesso'
+        } catch (error) {
+            console.error('Erro ao atualizar o quarto:', error)
+            return 'Erro ao atualizar o quarto. Tente novamente mais tarde.'
+        }
+    }
+    
+    
+
 
 export const roomService = {
     createRoom,
     rentRoom,
     getAllRoomsAvailable,
+    deleteRoom,
+    updateRoom
+
 }

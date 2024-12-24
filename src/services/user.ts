@@ -15,18 +15,14 @@ async function createUser(
         if (!email || !senha || !nome) {
             return 'Campos obrigatorios: email, senha e nome'
         }
-
+        
         if (!['admin', 'customer'].includes(role)) {
             return 'usuario invalido Permitidos: admin, customer'
-        }
-
-
-        
+        }   
         await db.query(
             "INSERT INTO usuario (id, email, password, name, role) VALUES (?, ?, ?, ?, ?)",
             [parseInt(id_usuario), email, senha, nome, role]
         )
-
         const response = await getUserById(id_usuario)
         return {
             id: response.id,
@@ -59,7 +55,6 @@ async function getUserById(id: string): Promise<any> {
 
 async function checkExistingId(id: string): Promise<boolean> {
     try {
-
         const [result]: any = await db.query(
             "SELECT id FROM usuario WHERE id = ?",
             [id]
