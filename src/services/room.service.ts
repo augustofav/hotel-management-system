@@ -118,6 +118,46 @@ async function getAllRoomsAvailable(): Promise<any[]> {
             return 'Erro ao atualizar o quarto. Tente novamente mais tarde.'
         }
     }
+    async function getRoomById(roomId: string): Promise<any> {
+        try {
+            const [room]: any = await db.query(
+                "SELECT * FROM rooms WHERE id = ?",
+                [roomId]
+            )
+    
+            return room[0]
+        } catch (error) {
+            console.error('Erro ao buscar o quarto', error)
+            return 'Erro ao buscar o quarto'
+        }
+    }
+    interface RoomFilter {
+        lowPrice: number;
+        highPrice: number;
+    }
+
+    async function filterRoom(filter: RoomFilter, type: string): Promise<any[]> {
+        try {
+            const { lowPrice, highPrice, } = filter;
+            if(type === "Single") {
+                const [rooms]: any = await db.query(
+                    "SELECT * FROM rooms WHERE price BETWEEN ? AND ? WHERE type = 'Single'",
+                    [lowPrice, highPrice]
+                ); 
+                return rooms
+            }
+            else{
+                const [rooms]: any = await db.query(
+                    "SELECT * FROM rooms WHERE price BETWEEN ? AND ? WHERE type = 'Double'",
+                    [lowPrice, highPrice]
+                );
+                return rooms
+            }
+        } catch (error) {
+            console.error('Erro ao filtrar os quartos', error);
+            throw error;
+        }
+    }
     
     
 
@@ -127,6 +167,8 @@ export const roomService = {
     rentRoom,
     getAllRoomsAvailable,
     deleteRoom,
-    updateRoom
+    updateRoom,
+    getRoomById,
+    filterRoom,
 
 }

@@ -77,7 +77,33 @@ const roomController = {
         console.error('Erro ao atualizar o quarto:', error)
         res.status(500).send('Ocorreu um erro ao atualizar o quarto.')
     }
+},
+    getRoomById: async (req: Request, res: Response): Promise<void> => {
+        try {
+            const { roomId } = req.params
+            const room = await roomService.getRoomById(roomId)
+            res.status(200).send(room)
+        } catch (error) {
+            console.error('Erro ao buscar quarto:', error)
+            res.status(500).send('Ocorreu um erro ao buscar quarto.')
+        }
+    },
+    filterRoom: async (req: Request, res: Response): Promise<void> => {
+        try{
+            const {  filter, type} = req.body
+            const rooms = await roomService.filterRoom(filter, type)  
+            res.status(200).send(rooms)       
+        }
+        catch(error){
+            console.error('Erro ao filtrar os quartos', error);
+            res.status(500).send('Ocorreu um erro ao filtrar os quartos.')
+
+
+
+        }
+
 }}
+
 
 export default roomController;
 
