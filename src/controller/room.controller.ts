@@ -41,7 +41,6 @@ const roomController = {
         }
     },
 
-
     getAllRoomsAvailable: async (req: Request, res: Response): Promise<void> => {
         try {
             const rooms = await roomService.getAllRoomsAvailable()
@@ -51,6 +50,7 @@ const roomController = {
             res.status(500).send('Ocorreu um erro ao buscar quartos.')
         }
     },
+
     deleteRoom: async (req: Request, res: Response): Promise<void> => {
         try {
             const { roomId } = req.params
@@ -60,7 +60,9 @@ const roomController = {
             console.error('Erro ao deletar o quarto:', error)
             res.status(500).send('Ocorreu um erro ao deletar o quarto.')
         }
-},  updateRoom: async (req: Request, res: Response): Promise<void> => {
+    }, 
+
+updateRoom: async (req: Request, res: Response): Promise<void> => {
     const { roomId } = req.params
     const { hotelId, roomNumber, type, price } = req.body
 
@@ -69,15 +71,14 @@ const roomController = {
             res.status(400).send('Campos obrigatórios hotelId, roomNumber, type, price.')
             return
         }
-
         const result = await roomService.updateRoom(roomId, hotelId, roomNumber, type, price)
-
         res.status(200).send(result)
     } catch (error) {
         console.error('Erro ao atualizar o quarto:', error)
         res.status(500).send('Ocorreu um erro ao atualizar o quarto.')
-    }
-},
+        }
+    },
+
     getRoomById: async (req: Request, res: Response): Promise<void> => {
         try {
             const { roomId } = req.params
@@ -88,6 +89,7 @@ const roomController = {
             res.status(500).send('Ocorreu um erro ao buscar quarto.')
         }
     },
+
     filterRoom: async (req: Request, res: Response): Promise<void> => {
         try{
             const {  filter, type} = req.body
@@ -97,12 +99,34 @@ const roomController = {
         catch(error){
             console.error('Erro ao filtrar os quartos', error);
             res.status(500).send('Ocorreu um erro ao filtrar os quartos.')
-
-
-
         }
 
-}}
+    },
+
+    getRoomsByHotel: async (req: Request, res: Response): Promise<void> => {
+        try {
+            const { hotelId } = req.params
+            const rooms = await roomService.getRoomsByHotel(Number(hotelId))
+            res.status(200).send(rooms)
+        } catch (error) {
+            console.error('Erro ao buscar quartos:', error)
+            res.status(500).send('Ocorreu um erro ao buscar quartos.')
+        }
+    },
+
+    cancelReservation: async (req: Request, res: Response): Promise<void> => {
+        try {
+            const { roomId } = req.params
+            const result = await roomService.cancelReservation(roomId)
+            res.status(200).send(result)
+        } catch (error) {
+            console.error('Erro ao cancelar a reserva:', error)
+            res.status(500).send('Ocorreu um erro ao cancelar a reserva.')
+        }
+    }
+    
+
+}
 
 
 export default roomController;

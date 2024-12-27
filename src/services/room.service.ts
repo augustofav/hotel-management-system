@@ -60,7 +60,7 @@ async function rentRoom(roomId: string, endDate: Date, startDate: Date): Promise
 }
 
 
-cron.schedule('*/1 * * * *', async () => {
+cron.schedule('*/1 * * * *', async () => { 
     try {
         await db.query(`
             UPDATE rooms 
@@ -69,8 +69,9 @@ cron.schedule('*/1 * * * *', async () => {
         `)
     } catch (error) {
         console.error('Erro ao liberar quartos', error)
+        }
     }
-})
+)
 
 
 async function getAllRoomsAvailable(): Promise<any[]> {
@@ -83,7 +84,8 @@ async function getAllRoomsAvailable(): Promise<any[]> {
         console.error("erro ao buscar", error);
         throw error;
   
-    }}
+        }
+    }
 
     async function deleteRoom(roomId: string): Promise<any> {
         try {
@@ -94,6 +96,7 @@ async function getAllRoomsAvailable(): Promise<any[]> {
             return 'Erro ao remover o quarto';
         }
     }
+
     async function updateRoom(roomId: string, hotelId: number, 
         roomNumber: string, 
         type: string, 
@@ -118,6 +121,7 @@ async function getAllRoomsAvailable(): Promise<any[]> {
             return 'Erro ao atualizar o quarto. Tente novamente mais tarde.'
         }
     }
+
     async function getRoomById(roomId: string): Promise<any> {
         try {
             const [room]: any = await db.query(
@@ -131,36 +135,50 @@ async function getAllRoomsAvailable(): Promise<any[]> {
             return 'Erro ao buscar o quarto'
         }
     }
+
     interface RoomFilter {
-        lowPrice: number;
-        highPrice: number;
+    lowPrice: number
+    highPrice: number
+}
+
+async function filterRoom(filter: RoomFilter, type: string): Promise<any[]> {
+    try {
+        const { lowPrice, highPrice } = filter
+
+        const [rooms]: any = await db.query(
+            "SELECT * FROM rooms WHERE price BETWEEN ? AND ? AND type = ?",
+            [lowPrice, highPrice, type]
+        );
+
+        return rooms
+    } catch (error) {
+        console.error("Erro ao filtrar os quartos", error)
+        throw error
+    }}
+
+    async function getRoomsByHotel(hotelId: number): Promise<any[]> {
+        try {
+            const [rooms]: any = await db.query(
+                "SELECT * FROM rooms WHERE hotel_id = ?",
+                [hotelId]
+            );
+            return rooms
+        } catch (error) {
+            console.error("Erro ao obter quartos por hotel", error)
+            throw error
+        }
     }
 
-    async function filterRoom(filter: RoomFilter, type: string): Promise<any[]> {
+    async function cancelReservation(roomId: string): Promise<any> {
         try {
-            const { lowPrice, highPrice, } = filter;
-            if(type === "Single") {
-                const [rooms]: any = await db.query(
-                    "SELECT * FROM rooms WHERE price BETWEEN ? AND ? WHERE type = 'Single'",
-                    [lowPrice, highPrice]
-                ); 
-                return rooms
-            }
-            else{
-                const [rooms]: any = await db.query(
-                    "SELECT * FROM rooms WHERE price BETWEEN ? AND ? WHERE type = 'Double'",
-                    [lowPrice, highPrice]
-                );
-                return rooms
-            }
+            await db.query("UPDATE rooms SET status = 'available', start_date = NULL, end_date = NULL WHERE id = ?", [roomId])
+            return 'Reserva cancelada com sucesso'
         } catch (error) {
-            console.error('Erro ao filtrar os quartos', error);
-            throw error;
+            console.error('Erro ao cancelar a reserva', error)
+            return 'Erro ao cancelar a reserva'
         }
     }
     
-    
-
 
 export const roomService = {
     createRoom,
@@ -170,5 +188,8 @@ export const roomService = {
     updateRoom,
     getRoomById,
     filterRoom,
+    getRoomsByHotel,
+    cancelReservation
+ };
 
-}
+
