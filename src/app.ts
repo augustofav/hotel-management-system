@@ -4,6 +4,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
 import usuario from './routes/user';
+import room from './routes/room.routes';
 
 
 dotenv.config();
@@ -17,6 +18,7 @@ app.use(cookieParser());
 app.use(cors());
 
 app.use(usuario)
+app.use(room)
 
 
 
