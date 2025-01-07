@@ -4,28 +4,34 @@ import { response } from 'express';
 import { db } from '../config/database';
 import { format } from 'date-fns';
 const cron = require('node-cron');
+import { PrismaClient } from '@prisma/client';
 
 
+const prisma = new PrismaClient();
 
-
-async function createRoom(hotelId: number, 
-    roomNumber: string, 
-    type: string, 
+async function createRoom(hotelId: number,
+    roomNumber: string,
+    type: string,
     price: number
-):  Promise<any> {
+): Promise<any> {
     try {
-        if(!hotelId || !roomNumber || !type || !price){
+        if (!hotelId || !roomNumber || !type || !price) {
             return 'Campos obrigatorios'
         }
 
-        if(price < 0){
+        if (price < 0) {
             return 'Preço invalido'
         }
-        
-        await db.query(
-            "INSERT INTO rooms (hotel_id, room_number, type, price) VALUES (?, ?, ?, ?)",
-            [hotelId, roomNumber, type, price]
-        )
+
+        await prisma.room.create({
+            data: {
+                hotelId,
+                roomNumber,
+                type,
+                price,
+                status: 'available',
+            },
+        });
 
         return 'Quarto criado com sucesso'
     } catch (error) {
@@ -33,24 +39,34 @@ async function createRoom(hotelId: number,
         return 'Erro ao criar o quarto. Tente novamente mais tarde.'
     }
 }
-async function rentRoom(roomId: string, endDate: Date, startDate: Date): Promise<any> {
+async function rentRoom(roomId: number, endDate: Date, startDate: Date, userid: number): Promise<any> {
     try {
-        if (!roomId || !startDate || !endDate || new Date(startDate) > new Date(endDate) || new Date(startDate) < new Date()) {
+        if (!roomId || !startDate || !endDate || !userid || new Date(startDate) > new Date(endDate)) {
             return 'dados invalidos'
         }
 
-        const formattedStartDate = format(new Date(startDate), 'yyyy-MM-dd HH:mm:ss')
-        const formattedEndDate = format(new Date(endDate), 'yyyy-MM-dd HH:mm:ss')
 
-        const [existingReservation]: any = await db.query(
-            "SELECT status FROM rooms WHERE id = ? AND status = 'booked'",
-            [roomId]
-        )
+        const existingReservation = await prisma.room.findFirst({
+            where: {
+                id: roomId,
+                status: 'booked',
+            },
+        });
 
-        await db.query(
-            "UPDATE rooms SET status = 'booked', start_date = ?, end_date = ? WHERE id = ?",
-            [formattedStartDate, formattedEndDate, roomId]
-        )
+        if (existingReservation) {
+            return 'Quarto ja reservado'
+        }
+
+        await prisma.room.updateMany({
+            where: { id: roomId },
+            data: {
+                status: 'booked',
+                startDate,
+                endDate,
+                userId: userid,
+            },
+        });
+
 
         return 'quarto alugado com sucesso'
     } catch (error) {
@@ -60,83 +76,106 @@ async function rentRoom(roomId: string, endDate: Date, startDate: Date): Promise
 }
 
 
-cron.schedule('*/1 * * * *', async () => { 
+cron.schedule('*/1 * * * *', async () => {
     try {
-        await db.query(`
-            UPDATE rooms 
-            SET status = 'available', start_date = NULL, end_date = NULL
-            WHERE end_date <= NOW() AND status = 'booked'
-        `)
+        await prisma.room.updateMany({
+            where: {
+                status: 'booked',
+                endDate: {
+                    lte: new Date(),
+                },
+            },
+            data: {
+                status: 'available',
+                startDate: null,
+                endDate: null,
+                userId: null,
+            },
+        });
     } catch (error) {
         console.error('Erro ao liberar quartos', error)
-        }
     }
+}
 )
 
 
 async function getAllRoomsAvailable(): Promise<any[]> {
     try {
-        const [rooms]: any = await db.query(
-            "SELECT * FROM rooms WHERE status = 'available'"
-        );
+
+        const rooms = await prisma.room.findMany({
+            where: {
+                status: 'available',
+            },
+        });
+
         return rooms;
     } catch (error) {
         console.error("erro ao buscar", error);
         throw error;
-  
-        }
-    }
 
-    async function deleteRoom(roomId: string): Promise<any> {
-        try {
-            await db.query("DELETE FROM rooms WHERE id = ?", [roomId]);
-            return 'Quarto removido com sucesso';
-        } catch (error) {
-            console.error('Erro ao remover o quarto', error);
-            return 'Erro ao remover o quarto';
-        }
     }
+}
 
-    async function updateRoom(roomId: string, hotelId: number, 
-        roomNumber: string, 
-        type: string, 
-        price: number): Promise<any> {
-        try {
-            if(!hotelId || !roomNumber || !type || !price){
-                return 'Campos obrigatorios'
-            }
-    
-            if(price < 0){
-                return 'Preço invalido'
-            }
-            
-            await db.query(
-                "UPDATE rooms SET hotel_id = ?, room_number = ?, type = ?, price = ? WHERE id = ?",
-                [hotelId, roomNumber, type, price, roomId]
-            )
-    
-            return 'Quarto atualizado com sucesso'
-        } catch (error) {
-            console.error('Erro ao atualizar o quarto:', error)
-            return 'Erro ao atualizar o quarto. Tente novamente mais tarde.'
-        }
+async function deleteRoom(roomId: number): Promise<any> {
+    try {
+
+        await prisma.room.delete({
+            where: { id: roomId },
+        });
+
+        return 'Quarto removido com sucesso';
+    } catch (error) {
+        console.error('Erro ao remover o quarto', error);
+        return 'Erro ao remover o quarto';
     }
+}
 
-    async function getRoomById(roomId: string): Promise<any> {
-        try {
-            const [room]: any = await db.query(
-                "SELECT * FROM rooms WHERE id = ?",
-                [roomId]
-            )
-    
-            return room[0]
-        } catch (error) {
-            console.error('Erro ao buscar o quarto', error)
-            return 'Erro ao buscar o quarto'
+async function updateRoom(roomId: number, hotelId: number,
+    roomNumber: string,
+    type: string,
+    price: number): Promise<any> {
+    try {
+        if (!hotelId || !roomNumber || !type || !price) {
+            return 'Campos obrigatorios'
         }
-    }
 
-    interface RoomFilter {
+        if (price < 0) {
+            return 'Preço invalido'
+        }
+        await prisma.room.update({
+            where: { id: roomId },
+            data: {
+                hotelId,
+                roomNumber,
+                type,
+                price,
+            },
+        });
+
+
+        return 'Quarto atualizado com sucesso'
+    } catch (error) {
+        console.error('Erro ao atualizar o quarto:', error)
+        return 'Erro ao atualizar o quarto. Tente novamente mais tarde.'
+    }
+}
+
+async function getRoomById(roomId: number): Promise<any> {
+    try {
+
+        const room = await prisma.room.findUnique({
+            where: { id: roomId },
+        });
+
+
+        return room
+    } catch (error) {
+        console.error('Erro ao buscar o quarto', error)
+        return 'Erro ao buscar o quarto'
+    }
+}
+
+interface RoomFilter {
     lowPrice: number
     highPrice: number
 }
@@ -145,40 +184,72 @@ async function filterRoom(filter: RoomFilter, type: string): Promise<any[]> {
     try {
         const { lowPrice, highPrice } = filter
 
-        const [rooms]: any = await db.query(
-            "SELECT * FROM rooms WHERE price BETWEEN ? AND ? AND type = ?",
-            [lowPrice, highPrice, type]
-        );
+        const rooms = await prisma.room.findMany({
+            where: {
+                price: {
+                    gte: lowPrice,
+                    lte: highPrice,
+                },
+                type: type,
+            },
+        });
+
 
         return rooms
     } catch (error) {
         console.error("Erro ao filtrar os quartos", error)
         throw error
-    }}
-
-    async function getRoomsByHotel(hotelId: number): Promise<any[]> {
-        try {
-            const [rooms]: any = await db.query(
-                "SELECT * FROM rooms WHERE hotel_id = ?",
-                [hotelId]
-            );
-            return rooms
-        } catch (error) {
-            console.error("Erro ao obter quartos por hotel", error)
-            throw error
-        }
     }
+}
 
-    async function cancelReservation(roomId: string): Promise<any> {
-        try {
-            await db.query("UPDATE rooms SET status = 'available', start_date = NULL, end_date = NULL WHERE id = ?", [roomId])
-            return 'Reserva cancelada com sucesso'
-        } catch (error) {
-            console.error('Erro ao cancelar a reserva', error)
-            return 'Erro ao cancelar a reserva'
-        }
+async function getRoomsByHotel(hotelId: number): Promise<any[]> {
+    try {
+
+        const rooms = await prisma.room.findMany({
+            where: {
+                hotelId,
+            },
+        });
+
+        return rooms
+    } catch (error) {
+        console.error("Erro ao obter quartos por hotel", error)
+        throw error
     }
-    
+}
+
+async function cancelReservation(roomId: number): Promise<string> {
+    try {
+        await prisma.room.updateMany({
+            where: { id: roomId },
+            data: {
+                status: 'available',
+                startDate: null,
+                endDate: null,
+                userId: null,
+            },
+        });
+
+
+        return 'Reserva cancelada com sucesso'
+    } catch (error) {
+        console.error('Erro ao cancelar a reserva', error)
+        return 'Erro ao cancelar a reserva'
+    }
+}
+async function existingId(id: number): Promise<boolean> {
+    try {
+        const result = await prisma.room.findUnique({
+            where: { id: id },
+        });
+
+        return result ? true : false
+    } catch (error) {
+        console.error('Erro ao verificar se o quarto existe', error)
+        return false
+    }
+}
+
 
 export const roomService = {
     createRoom,
@@ -189,7 +260,8 @@ export const roomService = {
     getRoomById,
     filterRoom,
     getRoomsByHotel,
-    cancelReservation
- };
+    cancelReservation,
+    existingId
+};
 
 
