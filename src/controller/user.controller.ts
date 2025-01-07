@@ -21,7 +21,7 @@ const userController = {
     getUserById: async (req: Request, res: Response): Promise<void> => {
         const { id } = req.params;
         try {
-            const retorno = await userService.getUserById(id);
+            const retorno = await userService.getUserById(Number(id));
             if (!retorno) {
                 res.status(404).send('Usuário não encontrado.');
             } else {
@@ -36,7 +36,7 @@ const userController = {
     deleteUser: async (req: Request, res: Response): Promise<void> => {
         const { id } = req.params;
         try {
-            const retorno = await userService.deleteUser(id);
+            const retorno = await userService.deleteUser(Number(id));
             if (!retorno) {
                 res.status(404).send('Usuário não encontrado.');
             } else {
@@ -47,7 +47,28 @@ const userController = {
             res.status(500).send('Ocorreu um erro no servidor.');
         }
     },
+    getAllUsers: async (req: Request, res: Response): Promise<void> => {
+        try {
+            const retorno = await userService.getAllUsers();
+            res.status(200).send(retorno);
+        } catch (error) {
+            console.error('Erro ao buscar todos os usuários:', error);
+            res.status(500).send('Ocorreu um erro no servidor.');
+        }
+    },
+    getUserRooms: async (req: Request, res: Response): Promise<void> => {
+        try {
+            const { id } = req.params;
+            const retorno = await userService.getUserRooms(Number(id));
+            res.status(200).send(retorno);
+        } catch (error) {
+            console.error('Erro ao buscar salas do usuário:', error);
+            res.status(500).send('Ocorreu um erro no servidor.');
+        }
+    },
+
 };
+
 
 
 

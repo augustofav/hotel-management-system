@@ -46,7 +46,6 @@ model usuario {
   email String
   password String
   rooms Room[]
-
   Reservation Reservation[]
 }
 
